@@ -90,6 +90,7 @@ sentiment-analysis-api/
 ├── README.md
 ├── requirements.txt
 └── .gitignore
+```
 
 ---
 
