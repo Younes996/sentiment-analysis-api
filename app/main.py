@@ -2,6 +2,8 @@ import os
 from contextlib import asynccontextmanager
 
 import tensorflow as tf
+from model.preprocessing import custom_standardization
+
 from fastapi import FastAPI, HTTPException
 
 from app.schemas import TextInput
@@ -19,7 +21,9 @@ async def lifespan(app: FastAPI):
             f"Model file not found at {MODEL_PATH}. Train the model first."
         )
 
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model = tf.keras.models.load_model(MODEL_PATH,
+    custom_objects={"custom_standardization": custom_standardization}
+    )
     yield
 
 
