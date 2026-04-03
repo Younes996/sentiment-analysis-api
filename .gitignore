@@ -21,3 +21,16 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Dataset
+data/aclImdb/
+data/imdb_train.csv
+data/imdb_test.csv
+
+# Trained models / artifacts
+model/*.keras
+model/*.h5
+
+# Logs / temp
+logs/
+tmp/
