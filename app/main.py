@@ -6,12 +6,10 @@ from app.predict import load_sentiment_model, predict_sentiment
 from app.schemas import HealthResponse, PredictionResponse, TextInput
 
 MODEL_PATH = "model/sentiment_model.keras"
-model = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model
     load_sentiment_model()
     yield
 

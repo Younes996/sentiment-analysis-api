@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 
-from model.preprocessing import custom_standardization
+from src.sentiment_model.preprocessing import custom_standardization
 
 MODEL_PATH = "model/sentiment_model.keras"
 model = None
@@ -30,7 +30,7 @@ def predict_sentiment(text: str) -> dict:
     if model is None:
         raise RuntimeError("Model is not loaded.")
 
-    input_text = tf.constant([text], dtype=tf.string)
+    input_text = tf.constant([[text]], dtype=tf.string)
     raw_prediction = model.predict(input_text, verbose=0)
     prediction_value = float(raw_prediction[0][0])
 
