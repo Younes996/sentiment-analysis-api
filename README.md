@@ -77,20 +77,35 @@ It was designed as a complete mini production-style NLP project with:
 ```text
 sentiment-analysis-api/
 ├── app/
-│   └── main.py
-├── model/
 │   ├── __init__.py
-│   ├── preprocessing.py
-│   ├── train.py
+│   ├── main.py
+│   ├── schemas.py
+│   └── predict.py
+├── src/
+│   ├── __init__.py
+│   └── sentiment_model/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── data.py
+│       ├── preprocessing.py
+│       ├── architecture.py
+│       ├── training.py
+│       └── evaluation.py
+├── model/
+│   ├── sentiment_model.keras
 │   └── model_architecture.png
 ├── data/
+│   ├── build_imdb_csv.py
 │   ├── imdb_train.csv
 │   ├── imdb_test.csv
 │   └── aclImdb/
+├── notebooks/
 ├── README.md
 ├── requirements.txt
 └── .gitignore
 ```
+
+Dataset files and trained model files are generated or obtained locally and are excluded from version control.
 
 ---
 
@@ -198,7 +213,7 @@ Main ideas used in training:
 
 ## Results
 
-Current training results obtained on IMDb:
+The metrics below are historical results from an earlier training run. They have not yet been reproduced with the current code and are retained for reference pending reproducible evaluation.
 
 | Metric | Score |
 |---|---:|
@@ -212,29 +227,52 @@ Best validation accuracy observed during training:
 |---|---:|
 | Best Validation Accuracy | 85.08% |
 
-These results show that the model learns meaningful sentiment patterns while maintaining decent generalization on unseen reviews.
+Reproducible evaluation is needed before drawing conclusions about the current model's performance on unseen reviews.
 
 ---
 
 ## Installation
 
+Run these commands from the project root:
+
 ```bash
 python -m venv venv
-source venv/Scripts/activate
-pip install -r requirements.txt
 ```
 
-On macOS / Linux:
+Activate the virtual environment using the command for your terminal:
+
+**Windows — PowerShell**
+
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+**Windows — Git Bash**
+
+```bash
+source venv/Scripts/activate
+```
+
+**macOS / Linux — Bash or Zsh**
 
 ```bash
 source venv/bin/activate
 ```
+
+Then install the dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
 ---
 
 ## Train the Model
 
+Run this command from the project root with the virtual environment activated.
+
 ```bash
-python model/train.py
+python -m src.sentiment_model.training
 ```
 
 This script:
@@ -248,11 +286,21 @@ This script:
 
 ## Run the API
 
-```bash
+Run this command from the project root with the virtual environment activated.
+
+The trained model must already exist at `model/sentiment_model.keras`.
+If it is missing, complete the data preparation and training steps first.
+Starting the API loads the saved model; it does not train it.
+
+```text
 uvicorn app.main:app --reload
 ```
 
-Once the server is running, the API can be used for real-time sentiment prediction.
+Wait for `Application startup complete.`, then open:
+http://127.0.0.1:8000/docs
+
+The `--reload` option restarts the application when source files change during development.
+Press `Ctrl+C` in the terminal to stop the server.
 
 ---
 
@@ -268,6 +316,12 @@ http://127.0.0.1:8000/docs
 
 ## Example Request
 
+Send a `POST` request to `/predict` with `Content-Type: application/json`.
+
+The request body must contain a `text` field with a non-empty string.
+Strings containing only whitespace are rejected.
+Missing or invalid `text` values return HTTP `422`.
+
 ```json
 {
   "text": "I really loved this movie. The acting was great and the story was moving."
@@ -278,12 +332,23 @@ http://127.0.0.1:8000/docs
 
 ## Example Response
 
+An illustrative successful response (HTTP `200`):
+
 ```json
 {
   "prediction": "positive",
-  "score": 0.82
+  "score": 0.8214
 }
 ```
+
+- `prediction`: the selected class, either `positive` or `negative`.
+- `score`: the model score for the selected class, rounded to four decimal places.
+
+The model outputs a positive-class score `p`. The API selects `positive`
+when `p >= 0.5`, otherwise `negative`. The returned score is `p` for a
+positive prediction and `1 - p` for a negative prediction.
+
+This score does not guarantee that the prediction is correct.
 
 ---
 
