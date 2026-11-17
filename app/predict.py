@@ -1,10 +1,11 @@
-import os
+from pathlib import Path
 
 import tensorflow as tf
 
 from src.sentiment_model.preprocessing import custom_standardization
 
-MODEL_PATH = "model/sentiment_model.keras"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = PROJECT_ROOT / "model" / "sentiment_model.keras"
 model = None
 
 
@@ -12,7 +13,7 @@ def load_sentiment_model() -> None:
     """Load the trained sentiment analysis model into memory."""
     global model
 
-    if not os.path.exists(MODEL_PATH):
+    if not MODEL_PATH.is_file():
         raise FileNotFoundError(
             f"Model file not found at {MODEL_PATH}. Train the model first."
         )
