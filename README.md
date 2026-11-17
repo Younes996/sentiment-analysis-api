@@ -28,6 +28,7 @@ The project includes:
 - [Example Request](#example-request)
 - [Example Response](#example-response)
 - [Notes on Model Loading](#notes-on-model-loading)
+- [Tests](#tests)
 - [Future Improvements](#future-improvements)
 
 
@@ -367,6 +368,31 @@ custom_objects={"custom_standardization": custom_standardization}
 ```
 
 This ensures that inference uses the exact same preprocessing logic as training.
+
+---
+
+## Tests
+
+From the project root, activate the virtual environment and install
+the development dependencies:
+
+```text
+python -m pip install -r requirements-dev.txt
+```
+
+Run the automated tests:
+
+```text
+python -m unittest discover -s tests -v
+```
+
+The tests cover input validation, internal error handling, and HTTP
+prediction endpoints with simulated predictions.
+
+They do not require the saved model or a running Uvicorn server.
+TensorFlow is still imported by the application during test discovery.
+
+These tests do not evaluate the trained model's predictive quality.
 
 ---
 
