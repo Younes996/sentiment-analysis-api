@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -5,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from app.predict import load_sentiment_model, predict_sentiment
 from app.schemas import HealthResponse, PredictionResponse, TextInput
 
+logger = logging.getLogger(__name__)
 MODEL_PATH = "model/sentiment_model.keras"
 
 
@@ -36,5 +38,9 @@ def health():
 def predict(payload: TextInput):
     try:
         return predict_sentiment(payload.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Sentiment prediction failed.")
+        raise HTTPException(
+            status_code=500,
+            detail="Prediction failed. Please try again later.",
+        )
