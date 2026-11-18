@@ -280,8 +280,11 @@ This script:
 - loads the training data,
 - prepares the TensorFlow pipeline,
 - trains the BiLSTM model,
-- evaluates performance,
+- evaluates training and validation performance,
 - and saves the trained model.
+
+The test set is excluded from this training workflow and reserved for
+the final comparison. A separate final-evaluation command is not yet implemented.
 
 ---
 

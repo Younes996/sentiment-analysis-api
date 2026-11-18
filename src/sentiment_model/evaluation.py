@@ -1,13 +1,11 @@
-def evaluate_model(model, train_ds, val_ds, test_ds):
-    """Evaluate the model on train, validation, and test datasets."""
+def evaluate_model(model, train_ds, val_ds):
+    """Evaluate the model on train and validation datasets."""
     train_metrics = model.evaluate(train_ds, verbose=0, return_dict=True)
     val_metrics = model.evaluate(val_ds, verbose=0, return_dict=True)
-    test_metrics = model.evaluate(test_ds, verbose=0, return_dict=True)
 
     return {
         "train": train_metrics,
         "val": val_metrics,
-        "test": test_metrics,
     }
 
 

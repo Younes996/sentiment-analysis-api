@@ -12,7 +12,6 @@ from src.sentiment_model.config import (
     PLOT_OUTPUT_PATH,
     RANDOM_SEED,
     SEQUENCE_LENGTH,
-    TEST_PATH,
     TRAIN_PATH,
 )
 from src.sentiment_model.data import (
@@ -31,11 +30,8 @@ def main():
 
     if not os.path.exists(TRAIN_PATH):
         raise FileNotFoundError(f"Training CSV not found: {TRAIN_PATH}")
-    if not os.path.exists(TEST_PATH):
-        raise FileNotFoundError(f"Test CSV not found: {TEST_PATH}")
 
     full_train_df = load_data(TRAIN_PATH)
-    test_df = load_data(TEST_PATH)
 
     train_df, val_df = split_train_validation(full_train_df)
 
@@ -52,7 +48,6 @@ def main():
 
     train_ds = dataframe_to_dataset(train_df, batch_size=BATCH_SIZE, shuffle=True)
     val_ds = dataframe_to_dataset(val_df, batch_size=BATCH_SIZE, shuffle=False)
-    test_ds = dataframe_to_dataset(test_df, batch_size=BATCH_SIZE, shuffle=False)
 
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor="val_loss",
@@ -70,7 +65,7 @@ def main():
 
     print("\nFinal evaluation:")
 
-    metrics = evaluate_model(model, train_ds, val_ds, test_ds)
+    metrics = evaluate_model(model, train_ds, val_ds)
 
     print(
         f"Train loss: {metrics['train']['loss']:.4f} | "
@@ -79,10 +74,6 @@ def main():
     print(
         f"Val   loss: {metrics['val']['loss']:.4f} | "
         f"Val   accuracy: {metrics['val']['accuracy']:.4f}"
-    )
-    print(
-        f"Test  loss: {metrics['test']['loss']:.4f} | "
-        f"Test  accuracy: {metrics['test']['accuracy']:.4f}"
     )
 
     best_validation = summarize_best_validation(history)
