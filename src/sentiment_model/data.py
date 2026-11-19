@@ -1,33 +1,37 @@
+from pathlib import Path
+
 import pandas as pd
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
 
-from src.sentiment_model.config import RANDOM_SEED, VALIDATION_SIZE
-
-
-def load_data(path: str) -> pd.DataFrame:
-    """Load the sentiment dataset from a CSV file."""
-    df = pd.read_csv(path)
-
-    expected_columns = {"text", "label"}
-    if not expected_columns.issubset(df.columns):
-        raise ValueError("The dataset must contain 'text' and 'label' columns.")
-
-    df = df.dropna(subset=["text", "label"]).copy()
-    df["text"] = df["text"].astype(str)
-    df["label"] = df["label"].astype(int)
-
-    return df
+from src.sentiment_model.config import RANDOM_SEED
 
 
-def split_train_validation(df: pd.DataFrame):
-    """Split the official IMDb train set into train and validation sets."""
-    return train_test_split(
-        df,
-        test_size=VALIDATION_SIZE,
-        stratify=df["label"],
-        random_state=RANDOM_SEED,
+def load_train_validation(
+    train_path: Path,
+    partitions_path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    official_train_df = pd.read_csv(train_path)
+    partitions_df = pd.read_csv(partitions_path)
+
+    train_val_assignments = partitions_df.loc[
+        partitions_df["partition"].isin(["train", "validation"])
+    ]
+    joined_df = pd.merge(
+        train_val_assignments,
+        official_train_df,
+        how="left",
+        on="review_id",
+        validate="one_to_one",
     )
+    if joined_df[["text", "label"]].isna().any().any():
+        raise ValueError(
+            "One or more train or validation assignments have no matching IMDb "
+            "review or are missing a review text or label. "
+            "Check that the partitions file and the official IMDb train CSV match."
+        )
+    train_df = joined_df.loc[joined_df["partition"] == "train"].copy()
+    val_df = joined_df.loc[joined_df["partition"] == "validation"].copy()
+    return train_df, val_df
 
 
 def dataframe_to_dataset(

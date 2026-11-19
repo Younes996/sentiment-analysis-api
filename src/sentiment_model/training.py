@@ -1,5 +1,3 @@
-import os
-
 import tensorflow as tf
 
 from src.sentiment_model.architecture import build_model, save_model_plot
@@ -9,6 +7,7 @@ from src.sentiment_model.config import (
     EPOCHS,
     MAX_TOKENS,
     MODEL_OUTPUT_PATH,
+    PARTITIONS_PATH,
     PLOT_OUTPUT_PATH,
     RANDOM_SEED,
     SEQUENCE_LENGTH,
@@ -16,8 +15,7 @@ from src.sentiment_model.config import (
 )
 from src.sentiment_model.data import (
     dataframe_to_dataset,
-    load_data,
-    split_train_validation,
+    load_train_validation,
 )
 from src.sentiment_model.evaluation import (
     evaluate_model,
@@ -28,12 +26,7 @@ from src.sentiment_model.evaluation import (
 def main():
     tf.random.set_seed(RANDOM_SEED)
 
-    if not os.path.exists(TRAIN_PATH):
-        raise FileNotFoundError(f"Training CSV not found: {TRAIN_PATH}")
-
-    full_train_df = load_data(TRAIN_PATH)
-
-    train_df, val_df = split_train_validation(full_train_df)
+    train_df, val_df = load_train_validation(TRAIN_PATH, PARTITIONS_PATH)
 
     model = build_model(
         max_tokens=MAX_TOKENS,

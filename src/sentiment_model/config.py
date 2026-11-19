@@ -1,11 +1,16 @@
-TRAIN_PATH = "data/imdb_train.csv"
-TEST_PATH = "data/imdb_test.csv"
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "data"
+
+TRAIN_PATH = DATA_DIR / "imdb_train.csv"
+TEST_PATH = DATA_DIR / "imdb_test.csv"
+PARTITIONS_PATH = DATA_DIR / "imdb_partitions.csv"
 
 MODEL_OUTPUT_PATH = "model/sentiment_model.keras"
 PLOT_OUTPUT_PATH = "model/model_architecture.png"
 
 RANDOM_SEED = 42
-VALIDATION_SIZE = 0.2
 
 MAX_TOKENS = 10000
 SEQUENCE_LENGTH = 200
