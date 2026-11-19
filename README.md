@@ -54,7 +54,8 @@ It was designed as a complete mini production-style NLP project with:
 - Custom text cleaning with a reusable `custom_standardization` function
 - `TextVectorization` integrated into the model pipeline
 - **Bidirectional LSTM** for contextual sequence learning
-- Validation split + **EarlyStopping**
+- Frozen train and validation partitions for reproducible experiments
+- **EarlyStopping** based on validation loss
 - FastAPI inference service
 - Architecture image included for documentation
 - Project structure ready for **Streamlit** and **Docker**
@@ -97,6 +98,8 @@ sentiment-analysis-api/
 │   └── model_architecture.png
 ├── data/
 │   ├── build_imdb_csv.py
+│   ├── audit_imdb_duplicates.py
+│   ├── imdb_partitions.csv
 │   ├── imdb_train.csv
 │   ├── imdb_test.csv
 │   └── aclImdb/
@@ -106,7 +109,7 @@ sentiment-analysis-api/
 └── .gitignore
 ```
 
-Dataset files and trained model files are generated or obtained locally and are excluded from version control.
+The raw IMDb dataset, review exports, and trained model files are kept locally. The partition manifest is tracked in Git.
 
 ---
 
@@ -120,23 +123,36 @@ The official dataset source used in this project is the **Large Movie Review Dat
 
 - [Official dataset page](https://ai.stanford.edu/~amaas/data/sentiment/)
 
-In this project, the dataset is handled through:
-- raw IMDb data (`aclImdb/`)
-- CSV files prepared for training and evaluation:
-  - `data/imdb_train.csv`
-  - `data/imdb_test.csv`
+### Prepare the local exports
 
-Expected CSV format:
+Extract the Stanford dataset under `data/aclImdb/`, then run this command from the project root:
 
-```text
-text,label
-"This movie was amazing",1
-"I hated the ending",0
+```bash
+python data/build_imdb_csv.py
 ```
 
-Where:
-- `text` = review text
-- `label` = sentiment label (`1` for positive, `0` for negative)
+The script generates `data/imdb_train.csv` and `data/imdb_test.csv` with the following format:
+
+```csv
+text,label,review_id
+"This movie was amazing",1,train/pos/42_9.txt
+```
+
+The label is `1` for positive reviews and `0` for negative reviews. The `review_id` is the source file path relative to `aclImdb/`, so it stays stable if the dataset is moved or the CSV rows are reordered.
+
+### Frozen partitions and duplicate audit
+
+The tracked file `data/imdb_partitions.csv` contains one `review_id,partition` pair per retained review. The BiLSTM joins these assignments to the official training export by `review_id`. The same assignments will be used for the DistilBERT comparison.
+
+| Partition | Reviews |
+| --- | ---: |
+| Train | 19,824 |
+| Validation | 4,957 |
+| Official test | 25,000 |
+
+The audit groups exact matches using SHA-256 fingerprints of the exported review text. It removes 123 reviews from the official training pool because their texts also appear in the official test set. For the remaining training pool, it keeps the lexicographically smallest ID per text, removing 96 additional copies. It then sorts by ID and creates a stratified 20% validation split with seed `42`. The final audit found zero exact duplicate groups across partitions and zero within train or validation. The official test set is preserved in full.
+
+Use the tracked manifest for normal training. To regenerate it from the local exports, run `python data/audit_imdb_duplicates.py` from the project root. This command overwrites `data/imdb_partitions.csv` after the audit passes.
 
 ---
 
@@ -200,7 +216,7 @@ If Graphviz is not installed, training still works normally, but the architectur
 
 The training pipeline includes:
 - TensorFlow `tf.data.Dataset`
-- train / validation split
+- frozen train and validation assignments loaded by review ID
 - custom text preprocessing
 - model checkpointing through `.keras` serialization
 - `EarlyStopping` to reduce overfitting
@@ -270,14 +286,14 @@ python -m pip install -r requirements.txt
 
 ## Train the Model
 
-Run this command from the project root with the virtual environment activated.
+Prepare the [local IMDb exports](#prepare-the-local-exports), then run this command from the project root with the virtual environment activated.
 
 ```bash
 python -m src.sentiment_model.training
 ```
 
 This script:
-- loads the training data,
+- loads the frozen train and validation partitions,
 - prepares the TensorFlow pipeline,
 - trains the BiLSTM model,
 - evaluates training and validation performance,
