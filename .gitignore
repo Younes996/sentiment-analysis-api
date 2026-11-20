@@ -30,6 +30,7 @@ data/imdb_test.csv
 # Trained models / artifacts
 model/*.keras
 model/*.h5
+/model/seed_*/run_*/
 
 # Logs / temp
 logs/
