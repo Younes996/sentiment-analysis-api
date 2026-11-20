@@ -31,8 +31,8 @@ from src.sentiment_model.evaluation import (
 )
 
 
-def main():
-    run_dir = Path(f"model/seed_{RANDOM_SEED}/run_01")
+def main(run_name="run_01"):
+    run_dir = Path(f"model/seed_{RANDOM_SEED}/{run_name}")
     run_dir.mkdir(parents=True, exist_ok=False)
 
     git_commit = check_output(
