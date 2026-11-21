@@ -230,21 +230,19 @@ Main ideas used in training:
 
 ## Results
 
-The metrics below are historical results from an earlier training run. They have not yet been reproduced with the current code and are retained for reference pending reproducible evaluation.
+### BiLSTM baseline
 
-| Metric | Score |
-|---|---:|
-| Train Accuracy | 90.65% |
-| Validation Accuracy | 84.26% |
-| Test Accuracy | 83.40% |
+The BiLSTM baseline was trained on 19,824 IMDb reviews and evaluated on 4,957 validation reviews using the frozen partitions. It used seed `42`, Python 3.12.6, and TensorFlow 2.21.0. The reference artifacts are stored locally in `model/seed_42/run_01/`.
 
-Best validation accuracy observed during training:
+| Epoch | Validation Loss | Validation Accuracy |
+|---|---:|---:|
+| 1 (selected) | 0.3899 | 82.95% |
+| 2 | 0.4074 | 83.86% |
+| 3 | 0.4847 | 85.56% |
 
-| Metric | Score |
-|---|---:|
-| Best Validation Accuracy | 85.08% |
+Early stopping monitored validation loss with a patience of two epochs. Training stopped after epoch 3 and restored the weights from epoch 1, which had the lowest validation loss. The saved model achieved 90.45% training accuracy and 82.95% validation accuracy. The highest validation accuracy observed during training was 85.56% at epoch 3.
 
-Reproducible evaluation is needed before drawing conclusions about the current model's performance on unseen reviews.
+The official IMDb test set is reserved for the final model comparison.
 
 ---
 
@@ -286,21 +284,32 @@ python -m pip install -r requirements.txt
 
 ## Train the Model
 
-Prepare the [local IMDb exports](#prepare-the-local-exports), then run this command from the project root with the virtual environment activated.
+Prepare the [local IMDb exports](#prepare-the-local-exports), activate the virtual environment, and run the commands from the project root. Commit the training code before a baseline run so the Git commit recorded in `config.json` identifies the code used.
+
+Run the baseline with the default run name:
 
 ```bash
 python -m src.sentiment_model.training
 ```
 
-This script:
-- loads the frozen train and validation partitions,
-- prepares the TensorFlow pipeline,
-- trains the BiLSTM model,
-- evaluates training and validation performance,
-- and saves the trained model.
+The default command writes to `model/seed_42/run_01/`. For a new experiment, choose a fresh run name that describes the change. For example, after configuring a variant with a sequence length of 300 tokens:
 
-The test set is excluded from this training workflow and reserved for
-the final comparison. A separate final-evaluation command is not yet implemented.
+```bash
+python -c "from src.sentiment_model.training import main; main('run_01_seq300')"
+```
+
+The run name identifies the output directory. The training settings are recorded in `config.json`. The script stops before training if the target directory already exists.
+
+Each run writes:
+
+- `config.json` with the seed, hyperparameters, Python and TensorFlow versions, Git commit, and SHA-256 hashes of the two input CSV files.
+- `history.json` with training and validation loss and accuracy for each completed epoch.
+- `sentiment_model.keras` with the restored weights from the epoch with the lowest validation loss.
+- `model_architecture.png` when Graphviz is available.
+
+Keep the baseline run directory as the reference for later experiments. Give each variant a fresh name beginning with `run_`, such as `run_01_seq300`, and record the setting or preprocessing change alongside its validation results.
+
+The script loads the frozen training and validation partitions. The official test set is reserved for the final comparison.
 
 ---
 
@@ -308,7 +317,7 @@ the final comparison. A separate final-evaluation command is not yet implemented
 
 Run this command from the project root with the virtual environment activated.
 
-The trained model must already exist at `model/sentiment_model.keras`.
+The API loads the model from `model/sentiment_model.keras`. To serve the BiLSTM baseline, copy `model/seed_42/run_01/sentiment_model.keras` to `model/sentiment_model.keras`. This replaces any model already stored at the destination.
 If it is missing, complete the data preparation and training steps first.
 Starting the API loads the saved model; it does not train it.
 
