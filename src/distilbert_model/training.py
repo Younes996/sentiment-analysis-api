@@ -1,10 +1,14 @@
 import argparse
+import json
+import re
+from platform import python_version
+from pathlib import Path
 import torch
 from pandas import DataFrame
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, BatchEncoding, DistilBertForSequenceClassification, PreTrainedTokenizerBase
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, BatchEncoding, DistilBertForSequenceClassification, PreTrainedTokenizerBase, __version__
 
 from src.distilbert_model.data import encode_batch
-from src.distilbert_model.config import CHECKPOINT_ID, CHECKPOINT_REVISION
+from src.distilbert_model.config import CHECKPOINT_ID, CHECKPOINT_REVISION, MAX_LENGTH, RANDOM_SEED, LEARNING_RATE, RUNS_DIR
 
 from src.sentiment_model.config import TRAIN_PATH, PARTITIONS_PATH
 from src.sentiment_model.data import load_train_validation
@@ -117,6 +121,12 @@ def parse_args() -> argparse.Namespace:
         default=3,
         help="Number of examples in the validation set (default: 3).",
     )
+    parser.add_argument(
+            "--run-name",
+            type=str,
+            default="smoke_01",
+            help="A simple folder name (default: smoke_01).",
+        )
 
     args = parser.parse_args()
     if args.epochs <= 0:
@@ -127,6 +137,11 @@ def parse_args() -> argparse.Namespace:
         parser.error("--train-limit must be positive.")
     if args.val_limit <= 0:
         parser.error("--val-limit must be positive.")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", args.run_name):
+        parser.error(
+            "--run-name must contain only letters (A-Z, a-z), "
+            "digits (0-9), hyphens (-), and underscores (_)."
+        )
 
     return args
 
@@ -135,18 +150,21 @@ def main() -> None:
     """Run a configurable smoke test on small IMDb subsets."""
     args = parse_args()
 
+    run_dir = RUNS_DIR / f"seed_{RANDOM_SEED}" / args.run_name
+    run_dir.mkdir(parents=True, exist_ok=False)
+
     tokenizer = AutoTokenizer.from_pretrained(
         CHECKPOINT_ID,
         revision=CHECKPOINT_REVISION,
     )
 
-    torch.manual_seed(42)
+    torch.manual_seed(RANDOM_SEED)
     model = AutoModelForSequenceClassification.from_pretrained(
         CHECKPOINT_ID,
         revision=CHECKPOINT_REVISION,
         num_labels=2,
     )
-    optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
     train_df, val_df = load_train_validation(TRAIN_PATH, PARTITIONS_PATH)
     train_examples = train_df.iloc[:args.train_limit]
@@ -155,6 +173,27 @@ def main() -> None:
     print(f"Training set: {len(train_examples)} examples")
     print(f"Validation set: {len(val_examples)} examples")
 
+    run_config = {
+        "checkpoint_id": CHECKPOINT_ID,
+        "checkpoint_revision": CHECKPOINT_REVISION,
+        "max_length": MAX_LENGTH,
+        "seed": RANDOM_SEED,
+        "learning_rate": LEARNING_RATE,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "train_limit": args.train_limit,
+        "validation_limit": args.val_limit,
+        "train_size": len(train_examples),
+        "validation_size": len(val_examples),
+        "python_version": python_version(),
+        "torch_version": torch.__version__,
+        "transformers_version": __version__,
+    }
+    config_path = run_dir / "config.json"
+    with open(config_path, mode="w", encoding="utf-8") as c:
+        json.dump(run_config, c, indent=2)
+
+    history = []
     for epoch in range(1, args.epochs + 1):
         training_loss = train_epoch(
             model, tokenizer, optimizer, train_examples, args.batch_size
@@ -166,6 +205,20 @@ def main() -> None:
         print(f"Epoch {epoch}:")
         print(f"Training loss: {training_loss:.8f}")
         print(f"Validation loss: {validation_loss:.8f}")
+
+        history.append({
+            "epoch": epoch,
+            "training_loss": training_loss,
+            "validation_loss": validation_loss,
+        })
+
+    history_path = run_dir / "history.json"
+    with open(history_path, mode="w", encoding="utf-8") as h:
+        json.dump(history, h, indent=2)
+
+    checkpoint_dir = run_dir / "checkpoint"
+    model.save_pretrained(checkpoint_dir)
+    tokenizer.save_pretrained(checkpoint_dir)
 
 
 if __name__ == "__main__":
