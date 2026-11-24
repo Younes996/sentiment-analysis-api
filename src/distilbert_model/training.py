@@ -1,3 +1,5 @@
+from subprocess import check_output
+from hashlib import sha256
 import argparse
 import json
 import re
@@ -173,6 +175,11 @@ def main() -> None:
     print(f"Training set: {len(train_examples)} examples")
     print(f"Validation set: {len(val_examples)} examples")
 
+    git_commit = check_output(
+        ["git", "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+
     run_config = {
         "checkpoint_id": CHECKPOINT_ID,
         "checkpoint_revision": CHECKPOINT_REVISION,
@@ -188,6 +195,9 @@ def main() -> None:
         "python_version": python_version(),
         "torch_version": torch.__version__,
         "transformers_version": __version__,
+        "partitions_sha256": sha256(PARTITIONS_PATH.read_bytes()).hexdigest(),
+        "train_csv_sha256": sha256(TRAIN_PATH.read_bytes()).hexdigest(),
+        "git_commit": git_commit,
     }
     config_path = run_dir / "config.json"
     with open(config_path, mode="w", encoding="utf-8") as c:
