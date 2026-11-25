@@ -4,13 +4,27 @@ import argparse
 import json
 import re
 from platform import python_version
-from pathlib import Path
+
 import torch
 from pandas import DataFrame
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, BatchEncoding, DistilBertForSequenceClassification, PreTrainedTokenizerBase, __version__
+from transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    BatchEncoding,
+    DistilBertForSequenceClassification,
+    PreTrainedTokenizerBase,
+    __version__
+)
 
 from src.distilbert_model.data import encode_batch
-from src.distilbert_model.config import CHECKPOINT_ID, CHECKPOINT_REVISION, MAX_LENGTH, RANDOM_SEED, LEARNING_RATE, RUNS_DIR
+from src.distilbert_model.config import (
+    CHECKPOINT_ID,
+    CHECKPOINT_REVISION,
+    MAX_LENGTH,
+    RANDOM_SEED,
+    LEARNING_RATE,
+    RUNS_DIR
+)
 
 from src.sentiment_model.config import TRAIN_PATH, PARTITIONS_PATH
 from src.sentiment_model.data import load_train_validation
@@ -49,6 +63,7 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     examples: DataFrame,
     batch_size: int,
+    head_only: bool = False,
 ) -> float:
     """Train for one epoch and return the mean loss per example."""
     if batch_size <= 0:
@@ -57,14 +72,25 @@ def train_epoch(
         raise ValueError("Training requires at least one example.")
 
     model.train()
-    total_loss = 0.0
+    if head_only:
+        model.distilbert.eval()
 
-    for start in range(0, len(examples), batch_size):
+    total_loss = 0.0
+    total_batches = (len(examples) + batch_size - 1) // batch_size
+    log_interval = 500
+
+    for batch_number, start in enumerate(
+        range(0, len(examples), batch_size),
+        start=1,
+    ):
         batch_examples = examples.iloc[start:start + batch_size]
         batch_inputs, batch_labels = encode_batch(tokenizer, batch_examples)
         batch_loss = train_step(model, optimizer, batch_inputs, batch_labels)
 
         total_loss += batch_loss * len(batch_examples)
+
+        if batch_number % log_interval == 0 or batch_number == total_batches:
+            print(f"Training batch {batch_number}/{total_batches}", flush=True)
 
     return total_loss / len(examples)
 
@@ -129,6 +155,11 @@ def parse_args() -> argparse.Namespace:
             default="smoke_01",
             help="A simple folder name (default: smoke_01).",
         )
+    parser.add_argument(
+        "--head-only",
+        action="store_true",
+        help="Freeze the DistilBERT encoder and train only the classification head.",
+    )
 
     args = parser.parse_args()
     if args.epochs <= 0:
@@ -166,7 +197,13 @@ def main() -> None:
         revision=CHECKPOINT_REVISION,
         num_labels=2,
     )
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    if args.head_only:
+        model.distilbert.requires_grad_(False)
+
+    optimizer = torch.optim.AdamW(
+        (parameter for parameter in model.parameters() if parameter.requires_grad),
+        lr=LEARNING_RATE,
+    )
 
     train_df, val_df = load_train_validation(TRAIN_PATH, PARTITIONS_PATH)
     train_examples = train_df.iloc[:args.train_limit]
@@ -188,6 +225,7 @@ def main() -> None:
         "learning_rate": LEARNING_RATE,
         "epochs": args.epochs,
         "batch_size": args.batch_size,
+        "head_only": args.head_only,
         "train_limit": args.train_limit,
         "validation_limit": args.val_limit,
         "train_size": len(train_examples),
@@ -206,7 +244,7 @@ def main() -> None:
     history = []
     for epoch in range(1, args.epochs + 1):
         training_loss = train_epoch(
-            model, tokenizer, optimizer, train_examples, args.batch_size
+            model, tokenizer, optimizer, train_examples, args.batch_size, args.head_only
         )
         validation_loss = validate_epoch(
             model, tokenizer, val_examples, args.batch_size
