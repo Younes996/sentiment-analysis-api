@@ -97,12 +97,19 @@ def compute_f1(precision: float, recall: float) -> float:
 
 
 def main() -> None:
-    """Evaluate a local DistilBERT checkpoint on the frozen validation split."""
-    parser = argparse.ArgumentParser(description="Evaluate a local DistilBERT checkpoint.")
+    """Evaluate a local DistilBERT checkpoint on a frozen IMDb split."""
+    parser = argparse.ArgumentParser(
+        description="Evaluate a local DistilBERT checkpoint."
+    )
     parser.add_argument(
         "checkpoint_dir",
         type=Path,
         help="Path to the saved model and tokenizer directory.",
+    )
+    parser.add_argument(
+        "--split",
+        choices=("train", "validation"),
+        default="validation",
     )
     args = parser.parse_args()
 
@@ -114,14 +121,19 @@ def main() -> None:
         args.checkpoint_dir,
         local_files_only=True
     )
-    _, val_df = load_train_validation(TRAIN_PATH, PARTITIONS_PATH)
+    train_df, val_df = load_train_validation(TRAIN_PATH, PARTITIONS_PATH)
 
-    accuracy, confusion_matrix = evaluate_classifier(model, tokenizer, val_df, batch_size=2)
+    examples = train_df if args.split == "train" else val_df
+    accuracy, confusion_matrix = evaluate_classifier(
+        model, tokenizer, examples, batch_size=2
+    )
+
     precision = compute_positive_precision(confusion_matrix)
     recall = compute_positive_recall(confusion_matrix)
     f1_score = compute_f1(precision, recall)
 
-    print(f"Validation accuracy: {accuracy:.2%}")
+    print(f"{args.split} set:\n")
+    print(f"Accuracy: {accuracy:.2%}")
     print(f"Positive-class precision: {precision:.2%}")
     print(f"Positive-class recall: {recall:.2%}")
     print(f"Positive-class F1: {f1_score:.2%}")
@@ -129,7 +141,7 @@ def main() -> None:
     print(confusion_matrix)
 
     metrics = {
-        "validation_size": len(val_df),
+        f"{args.split}_size": len(examples),
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
@@ -137,7 +149,7 @@ def main() -> None:
         "confusion_matrix": confusion_matrix.tolist(),
     }
 
-    metrics_path = args.checkpoint_dir.parent / "validation_metrics.json"
+    metrics_path = args.checkpoint_dir.parent / f"{args.split}_metrics.json"
     with open(metrics_path, mode="w", encoding="utf-8") as metrics_file:
         json.dump(metrics, metrics_file, indent=2)
 
