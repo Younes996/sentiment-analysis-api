@@ -31,6 +31,7 @@ data/imdb_test.csv
 model/*.keras
 model/*.h5
 /model/seed_*/run_*/
+/model/distilbert/
 
 # Logs / temp
 logs/
