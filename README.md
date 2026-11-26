@@ -36,7 +36,7 @@ The project includes:
 
 ## Overview
 
-This project performs **binary sentiment analysis** on movie reviews.  
+This project performs **binary sentiment analysis** on movie reviews.
 Given a raw text review, the model predicts whether the sentiment is **positive** or **negative**.
 
 It was designed as a complete mini production-style NLP project with:
@@ -142,7 +142,7 @@ The label is `1` for positive reviews and `0` for negative reviews. The `review_
 
 ### Frozen partitions and duplicate audit
 
-The tracked file `data/imdb_partitions.csv` contains one `review_id,partition` pair per retained review. The BiLSTM joins these assignments to the official training export by `review_id`. The same assignments will be used for the DistilBERT comparison.
+The tracked file `data/imdb_partitions.csv` contains one `review_id,partition` pair per retained review. The BiLSTM joins these assignments to the official training export by `review_id`. DistilBERT uses the same frozen assignments.
 
 | Partition | Reviews |
 | --- | ---: |
@@ -182,7 +182,7 @@ The embedding layer uses:
 mask_zero=True
 ```
 
-This allows the model to ignore padding tokens added after vectorization.  
+This allows the model to ignore padding tokens added after vectorization.
 As a result, padded values do not interfere with sequence learning inside the LSTM.
 
 ### Input / Output
@@ -244,6 +244,41 @@ Early stopping monitored validation loss with a patience of two epochs. Training
 
 The official IMDb test set is reserved for the final model comparison.
 
+### DistilBERT experiments
+
+All DistilBERT experiments used the same frozen IMDb partitions: 19,824
+training reviews and 4,957 validation reviews. They used
+`distilbert/distilbert-base-uncased`, seed 42, a batch size of 2, and a
+maximum sequence length of 256 tokens.
+
+| Run | Training strategy | Epochs | Validation accuracy | Positive-class F1 |
+| --- | --- | ---: | ---: | ---: |
+| `run_01` | Full fine-tuning | 1 | 89.31% | 89.65% |
+| `run_02_head_only` | Classification head only | 1 | 82.75% | 83.39% |
+| `run_03_head_only_3epochs` | Classification head only | 3 | 84.28% | 84.83% |
+
+`run_01` achieved the strongest validation result. Its positive-class
+precision was 87.20% and its positive-class recall was 92.25%.
+
+Freezing the DistilBERT encoder made training substantially faster, but the
+head-only variants remained below full fine-tuning on the validation set. The
+three-epoch head-only run improved over the one-epoch head-only run, with
+validation loss decreasing from 0.39157 to 0.36716.
+
+| Run | Training accuracy | Validation accuracy | Accuracy gap | Training time |
+| --- | ---: | ---: | ---: | --- |
+| `run_01` | 95.21% | 89.31% | 5.90 points | 8 h 38 min 48 s |
+| `run_02_head_only` | 83.63% | 82.75% | 0.88 points | 2 h 19 min 33 s |
+| `run_03_head_only_3epochs` | 84.90% | 84.28% | 0.61 points | 6 h 01 min 13 s |
+
+The full fine-tuning run has a larger training-validation gap, so it should be
+monitored for overfitting. However, it remains the selected checkpoint because
+it provides the best validation accuracy and F1 score.
+
+Run artifacts are stored under `model/distilbert/seed_42/<run-name>/`. The
+official IMDb test split remains untouched and is reserved for the final model
+comparison.
+
 ---
 
 ## Installation
@@ -284,6 +319,8 @@ python -m pip install -r requirements.txt
 
 ## Train the Model
 
+### Train the BiLSTM
+
 Prepare the [local IMDb exports](#prepare-the-local-exports), activate the virtual environment, and run the commands from the project root. Commit the training code before a baseline run so the Git commit recorded in `config.json` identifies the code used.
 
 Run the baseline with the default run name:
@@ -310,6 +347,51 @@ Each run writes:
 Keep the baseline run directory as the reference for later experiments. Give each variant a fresh name beginning with `run_`, such as `run_01_seq300`, and record the setting or preprocessing change alongside its validation results.
 
 The script loads the frozen training and validation partitions. The official test set is reserved for the final comparison.
+
+### Train and evaluate DistilBERT
+
+Prepare the local IMDb exports as described in the Dataset section. With the
+project virtual environment in `venv/`, install the CPU build of PyTorch and the
+DistilBERT dependencies:
+
+```bash
+./venv/Scripts/python.exe -m pip install "torch==2.15.0" --index-url https://download.pytorch.org/whl/cpu
+./venv/Scripts/python.exe -m pip install -r requirements-distilbert.txt
+```
+
+To reproduce the full fine-tuning settings of `run_01`, train for one epoch on
+the frozen IMDb training split and validate on the full validation split:
+
+```bash
+./venv/Scripts/python.exe -m src.distilbert_model.training \
+  --run-name run_01_repro --epochs 1 --batch-size 2 \
+  --train-limit 19824 --val-limit 4957
+```
+
+To train only the classification head while keeping the DistilBERT encoder frozen,
+add `--head-only`. For example, the three-epoch head-only experiment can be
+reproduced with:
+
+```bash
+./venv/Scripts/python.exe -m src.distilbert_model.training \
+  --run-name run_03_head_only_3epochs_repro --epochs 3 --batch-size 2 \
+  --train-limit 19824 --val-limit 4957 --head-only
+```
+
+Choose an unused name for `--run-name`. The script saves the run configuration,
+loss history, model, and tokenizer under `model/distilbert/seed_42/<run-name>/`.
+
+Evaluate the saved checkpoint on the frozen validation split. Use the same run
+name as in the training command:
+
+```bash
+./venv/Scripts/python.exe -m src.distilbert_model.evaluation \
+  model/distilbert/seed_42/run_01_repro/checkpoint
+```
+
+The evaluation prints accuracy, positive-class precision, recall, F1, and the
+confusion matrix. It also writes `validation_metrics.json` in the run directory.
+The official IMDb test split is reserved for the final comparison.
 
 ---
 
