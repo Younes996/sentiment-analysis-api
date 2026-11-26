@@ -243,6 +243,8 @@ def main() -> None:
 
     history = []
     for epoch in range(1, args.epochs + 1):
+        print(f"\nEpoch {epoch}/{args.epochs}", flush=True)
+
         training_loss = train_epoch(
             model, tokenizer, optimizer, train_examples, args.batch_size, args.head_only
         )
@@ -250,7 +252,6 @@ def main() -> None:
             model, tokenizer, val_examples, args.batch_size
         )
 
-        print(f"Epoch {epoch}:")
         print(f"Training loss: {training_loss:.8f}")
         print(f"Validation loss: {validation_loss:.8f}")
 

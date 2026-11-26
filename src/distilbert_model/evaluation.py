@@ -132,7 +132,7 @@ def main() -> None:
     recall = compute_positive_recall(confusion_matrix)
     f1_score = compute_f1(precision, recall)
 
-    print(f"{args.split} set:\n")
+    print(f"\n{args.split} set:\n")
     print(f"Accuracy: {accuracy:.2%}")
     print(f"Positive-class precision: {precision:.2%}")
     print(f"Positive-class recall: {recall:.2%}")
